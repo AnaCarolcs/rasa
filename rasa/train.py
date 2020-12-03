@@ -326,7 +326,11 @@ def _interpreter_from_previous_model(
     with model.unpack_model(old_model_zip_path) as unpacked:
         _, old_nlu = model.get_model_subdirectories(unpacked)
         return rasa.core.interpreter.create_interpreter(old_nlu)
-
+#
+# def _load_model_for_finetune(
+#     old_path
+# ):
+#
 
 def train_core(
     domain: Union[Domain, Text],
@@ -631,7 +635,7 @@ async def _train_nlu_with_validated_data(
         )
 
         if model_to_finetune:
-            model_to_finetune = _nlu_model_for_finetuning(model_to_finetune)
+            model_to_finetune = _nlu_model_for_finetuning(model_to_finetune, finetuning_epoch_fraction, config)
 
             if not model_to_finetune:
                 rasa.shared.utils.cli.print_warning(
@@ -652,7 +656,6 @@ async def _train_nlu_with_validated_data(
                 fixed_model_name="nlu",
                 persist_nlu_training_data=persist_nlu_training_data,
                 model_to_finetune=model_to_finetune,
-                finetuning_epoch_fraction=finetuning_epoch_fraction,
                 **additional_arguments,
             )
         rasa.shared.utils.cli.print_color(
@@ -674,19 +677,16 @@ async def _train_nlu_with_validated_data(
         return _train_path
 
 
-def _nlu_model_for_finetuning(model_to_finetune: Text) -> Optional[Interpreter]:
+def _nlu_model_for_finetuning(model_to_finetune: Text, finetuning_epoch_fraction, config) -> Optional[Interpreter]:
     from rasa.core.interpreter import RasaNLUInterpreter
 
     path_to_archive = model.get_model_for_finetuning(model_to_finetune)
     if not path_to_archive:
         return None
 
-    try:
-        interpreter = _interpreter_from_previous_model(path_to_archive)
-        if interpreter and isinstance(interpreter, RasaNLUInterpreter):
-            return interpreter.interpreter
-    except Exception:
-        # Anything might go wrong. In that case we skip model finetuning.
-        pass
+    with model.unpack_model(path_to_archive) as unpacked:
+        _, old_nlu = model.get_model_subdirectories(unpacked)
+
+        Interpreter.load(old_nlu, new_config=config)
 
     return None

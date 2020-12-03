@@ -138,6 +138,7 @@ class Trainer:
         cfg: RasaNLUModelConfig,
         component_builder: Optional[ComponentBuilder] = None,
         skip_validation: bool = False,
+        old_model=None,
     ):
 
         self.config = cfg
@@ -154,8 +155,10 @@ class Trainer:
         if not self.skip_validation:
             components.validate_requirements(cfg.component_names)
 
-        # build pipeline
-        self.pipeline = self._build_pipeline(cfg, component_builder)
+        if old_model:
+            self.pipeline = old_model.pipeline
+        else:
+            self.pipeline = self._build_pipeline(cfg, component_builder)
 
     def _build_pipeline(
         self, cfg: RasaNLUModelConfig, component_builder: ComponentBuilder
@@ -297,6 +300,7 @@ class Interpreter:
         model_dir: Text,
         component_builder: Optional[ComponentBuilder] = None,
         skip_validation: bool = False,
+        new_config = None,
     ) -> "Interpreter":
         """Create an interpreter based on a persisted model.
 
@@ -314,18 +318,25 @@ class Interpreter:
 
         model_metadata = Metadata.load(model_dir)
 
+        for p1, p2 in zip(model_metadata.metadata['pipeline'], new_config['pipeline']):
+            assert p1.get('name') == p2.get('name')
+            if 'epochs' in p1:
+                # TODO: fraction mult
+                p1['epochs'] = p2.get('epochs', p1['epochs'])
+
         Interpreter.ensure_model_compatibility(model_metadata)
-        return Interpreter.create(model_metadata, component_builder, skip_validation)
+        return Interpreter.create(model_metadata, component_builder, skip_validation, should_finetune=new_config is not None)
 
     @staticmethod
     def create(
         model_metadata: Metadata,
         component_builder: Optional[ComponentBuilder] = None,
         skip_validation: bool = False,
+        should_finetune: bool = False,
     ) -> "Interpreter":
         """Load stored model and components defined by the provided metadata."""
 
-        context = {}
+        context = {'finetune_mode': should_finetune}
 
         if component_builder is None:
             # If no builder is passed, every interpreter creation will result

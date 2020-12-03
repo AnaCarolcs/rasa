@@ -1,0 +1,13 @@
+language: python
+python:
+  - "3.6"
+install:
+  pip install -r requirements.txt
+addons:
+  sonarcloud:
+    organization: "rasa" # the key of the org you chose at step #3
+    token:
+      secure: f9aeb96e643bed346d263e4a6a6146f94c1df89d # encrypted value of your token
+script:
+  # the following command line builds the project, runs the tests with coverage and then execute the SonarCloud analysis
+  - sonar-scanner
